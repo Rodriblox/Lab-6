@@ -1,0 +1,105 @@
+#include <Arduino.h>
+#include <LiquidCrystal.h>
+
+// -------------------- Pines --------------------
+// Potenciómetros
+#define POT_RED 34     // GPIO34 - entrada ADC
+#define POT_GREEN 35   // GPIO35 - entrada ADC
+
+// LED RGB (PWM)
+#define LED_RED 25
+#define LED_GREEN 27
+#define LED_BLUE 14
+
+// LCD (modo 8 bits)
+#define LCD_RS 33
+#define LCD_EN 32
+#define LCD_D0 19
+#define LCD_D1 18
+#define LCD_D2 5
+#define LCD_D3 17
+#define LCD_D4 16
+#define LCD_D5 4
+#define LCD_D6 2
+#define LCD_D7 15
+
+// -------------------- Objetos --------------------
+LiquidCrystal lcd(LCD_RS, LCD_EN,
+                  LCD_D0, LCD_D1, LCD_D2, LCD_D3,
+                  LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+
+// -------------------- Variables --------------------
+uint8_t redValue = 0;    // 0-255
+uint8_t greenValue = 0;  // 0-255
+uint8_t azulContador = 0; // 0-255 (solo por terminal serial)
+
+hw_timer_t *timer = NULL;
+
+// -------------------- Configuración --------------------
+void setup() {
+  Serial.begin(115200);
+
+  // Configuración PWM para LED RGB
+  ledcSetup(0, 5000, 8); // canal 0, 5 kHz, 8 bits
+  ledcAttachPin(LED_RED, 0);
+
+  ledcSetup(1, 5000, 8);
+  ledcAttachPin(LED_GREEN, 1);
+
+  ledcSetup(2, 5000, 8);
+  ledcAttachPin(LED_BLUE, 2);
+
+  // Inicializar LCD
+  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Hola LCD");
+  delay(1000);
+  lcd.clear();
+}
+
+// -------------------- Loop principal --------------------
+void loop() {
+  // ----- Parte A: Lectura y envío -----
+  redValue = map(analogRead(POT_RED), 0, 4095, 0, 255);
+  greenValue = map(analogRead(POT_GREEN), 0, 4095, 0, 255);
+
+  Serial.print("Rojo: ");
+  Serial.print(redValue);
+  Serial.print(" | Verde: ");
+  Serial.print(greenValue);
+  Serial.print(" | Azul: ");
+  Serial.println(azulContador);
+
+  // ----- Parte B: Lectura UART -----
+  if (Serial.available()) {
+    char c = Serial.read();
+    if (c == '+') {
+      if (azulContador < 255) azulContador++;
+    } else if (c == '-') {
+      if (azulContador > 0) azulContador--;
+    }
+    Serial.print("Nuevo Azul: ");
+    Serial.println(azulContador);
+  }
+
+  // ----- PWM -----
+  ledcWrite(0, redValue);
+  ledcWrite(1, greenValue);
+  ledcWrite(2, azulContador);
+
+  // ----- Parte C: LCD -----
+  lcd.setCursor(0, 0);
+  lcd.print("R:");
+  lcd.print(redValue);
+  lcd.print(" G:");
+  lcd.print(greenValue);
+  lcd.print("   "); // <-- Añade espacios extra aquí
+
+  lcd.setCursor(0, 1);
+  lcd.print("B:");
+  lcd.print(azulContador);
+  lcd.print("       "); // limpiar residuos
+
+  delay(200); // refresco
+}
